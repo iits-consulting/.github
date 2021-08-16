@@ -6,7 +6,7 @@
     "YAML"
   ],
   "filePatterns": [
-    "Chart.yaml",
+    "Chart.yml",
     "values.yaml",
     "templates"
   ]

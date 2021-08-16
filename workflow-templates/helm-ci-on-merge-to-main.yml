@@ -69,16 +69,16 @@ jobs:
         with:
           current_version: ${{ env.CURRENT_VERSION }}
           level: ${{ env.CORRECT_LABEL }}
-      - name: Find and replace version in Chart.yaml
+      - name: Find and replace version in Chart.yml
         uses: jacobtomlinson/gha-find-replace@master
         with:
           find: "version:.*"
           replace: "version: ${{ steps.bump_semver.outputs.new_version }}"
-          include: Chart.yaml
+          include: Chart.yml
       - name: Commit and push changes
         uses: EndBug/add-and-commit@v7
         with:
-          add: Chart.yaml
+          add: Chart.yml
           message: "[Auto-update] version updated"
           tag: ${{ steps.bump_semver.outputs.new_version }}
       - name: Bump version and push tag

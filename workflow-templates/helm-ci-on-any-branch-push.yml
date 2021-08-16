@@ -36,10 +36,10 @@ jobs:
       - name: Get new tag
         id: newtag
         run: |
-          ct=$(cat Chart.yaml | tr -d " " | grep -oP '(?<=version:)\d+\.\d+\.\d+')
+          ct=$(cat Chart.yml | tr -d " " | grep -oP '(?<=version:)\d+\.\d+\.\d+')
           if [[ -z $ct ]]
           then
-            echo "ERROR: Check your chart version in Chart.yaml file!!!"
+            echo "ERROR: Check your chart version in Chart.yml file!!!"
             echo "It should have SemVer numbers and be processed by '(?<=version:)\d+\.\d+\.\d+' regexp"
             exit 1
           fi
