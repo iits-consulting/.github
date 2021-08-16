@@ -1,5 +1,5 @@
 {
-  "name": "Merge stable and release",
+  "name": "Release stable on Pull-Request merge",
   "description": "Part of Helm charts CI process. On merge to the main, stable chart version will be released",
   "iconName": "helm-icon-color",
   "categories": [

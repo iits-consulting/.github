@@ -1,5 +1,5 @@
 {
-  "name": "Lint, PR, Release unstable",
+  "name": "Lint and Release unstable",
   "description": "Part of Helm charts CI process. This workflow starts Actions to build and release new 'unstable' chart version",
   "iconName": "helm-icon-color",
   "categories": [
