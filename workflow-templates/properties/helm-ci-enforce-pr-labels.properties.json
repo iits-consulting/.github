@@ -1,5 +1,5 @@
 {
-  "name": "Enforce PR labels (part of Charts-CI process)",
+  "name": "Enforce PR labels (part of Charts CI process)",
   "description": "Check on PR changes that it have one of the proper label (major, minor or patch)",
   "iconName": "helm-icon-color",
   "categories": [
