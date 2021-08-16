@@ -1,7 +1,7 @@
 {
   "name": "Merge stable and release",
   "description": "On merge to the main, stable chart version will be released",
-  "iconName": "helm-icon.svg",
+  "iconName": "helm-icon.png",
   "categories": [
     "YAML"
   ],
