@@ -4,8 +4,5 @@
   "iconName": "helm-icon-color",
   "categories": [
     "YAML"
-  ],
-  "filePatterns": [
-    "Chart.txt$"
   ]
 }

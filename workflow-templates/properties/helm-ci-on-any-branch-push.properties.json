@@ -1,13 +1,8 @@
 {
   "name": "Lint, PR, Release unstable",
-  "description": "This workflow starts Actions to build and release new 'unstable' chart version",
+  "description": "This workflow starts Actions to build and release new 'unstable' chart version.\ntest",
   "iconName": "helm-icon-color",
   "categories": [
     "YAML"
-  ],
-  "filePatterns": [
-    "Chart.yaml",
-    "values.yaml",
-    "templates"
   ]
 }
