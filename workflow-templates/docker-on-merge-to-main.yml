@@ -4,19 +4,17 @@
 # AZURE_DOCKER_PASSWORD
 # And tag your commit with app version (semver)
 
-name: Lint, PR, pre-Release
+name: Merge stable and release
 on:
   push:
-    paths-ignore:
-      - ".github/**"
-      - "*.md"
-      - "LICENSE"
-    branches-ignore:
+    branches:
       - master
 env:
   SLACK_CHANNEL_ID: "C02AJKXC8UT"
+
 jobs:
-  lint-and-release:
+  prepare-stable:
+    name: Build new image version
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -24,11 +22,60 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Check PR labels action step
+        id: check_pr_labels_major
+        uses: shioyang/check-pr-labels-on-push-action@v1.0.3
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          labels: '["major"]'
+
+      - name: Check PR labels action step
+        id: check_pr_labels_minor
+        uses: shioyang/check-pr-labels-on-push-action@v1.0.3
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          labels: '["minor"]'
+
+      - name: Check PR labels action step
+        id: check_pr_labels_patch
+        uses: shioyang/check-pr-labels-on-push-action@v1.0.3
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          labels: '["patch"]'
+
+      - name: Select proper label
+        run: |
+          if [[ "${{ steps.check_pr_labels_major.outputs.result }}" = true ]]; then
+            echo "CORRECT_LABEL=$(echo "major")" >> $GITHUB_ENV
+          elif [[ "${{ steps.check_pr_labels_minor.outputs.result }}" = true ]]; then
+            echo "CORRECT_LABEL=$(echo "minor")" >> $GITHUB_ENV
+          elif [[ "${{ steps.check_pr_labels_patch.outputs.result }}" = true ]]; then
+            echo "CORRECT_LABEL=$(echo "patch")" >> $GITHUB_ENV
+          else
+            echo "CORRECT_LABEL=$(echo "patch")" >> $GITHUB_ENV
+          fi
+
       - name: Get Previous tag
         id: previoustag
         uses: "WyriHaximus/github-action-get-previous-tag@v1"
+      - name: Put new version to the ENV
+        run: |
+          t=$(echo "${{ steps.previoustag.outputs.tag }}" | cut -d- -f1)
+          echo "CURRENT_VERSION=`echo ${t}`" >> $GITHUB_ENV
+      - name: Calculate new version
+        uses: actions-ecosystem/action-bump-semver@v1
+        id: bump_semver
+        with:
+          current_version: ${{ env.CURRENT_VERSION }}
+          level: ${{ env.CORRECT_LABEL }}
 
-      - name: 'Login via Azure CLI'
+      - name: Bump version and push tag
+        uses: ChloePlanet/github-tag-action@master
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CUSTOM_TAG: ${{ steps.bump_semver.outputs.new_version }}
+
+      - name: Login via Azure CLI
         uses: azure/login@v1
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
@@ -44,26 +91,16 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v1
 
-      - name: Define ENV VARS
-        id: define_env
-        run: echo "::set-output name=github-sha-short::$(echo $GITHUB_SHA | cut -c 1-7)"
-
-      - name: Build and Push Docker image
+      - name: Build and Push the OpenFaaS function
         uses: docker/build-push-action@v2
         with:
           push: true
-          tags: iitsc.azurecr.io/images/${{ github.event.repository.name }}:${{ steps.previoustag.outputs.tag }}-${{ steps.define_env.outputs.github-sha-short }}
+          tags: iitsc.azurecr.io/images/${{ github.event.repository.name }}:${{ steps.bump_semver.outputs.new_version }}
 
-      - name: Bump version and push tag
-        uses: ChloePlanet/github-tag-action@master
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          CUSTOM_TAG: ${{ steps.previoustag.outputs.tag }}-${{ steps.define_env.outputs.github-sha-short }}
-
-###############################################################
-######## To use Slack app notifications, create json  #########
-####### payload file before and uncomment steps below #########
-###############################################################
+################################################################
+######### To use Slack app notifications, create json  #########
+######## payload file before and uncomment steps below #########
+################################################################
 #      - name: Notify slack success
 #        if: ${{ success() }}
 #        env:
