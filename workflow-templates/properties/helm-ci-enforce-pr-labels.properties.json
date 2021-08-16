@@ -4,5 +4,10 @@
   "iconName": "helm-icon-color",
   "categories": [
     "YAML"
+  ],
+  "filePatterns": [
+    "Chart.yaml",
+    "values.yaml",
+    "templates"
   ]
 }
