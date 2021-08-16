@@ -1,5 +1,5 @@
 {
-  "name": "Lint, PR, pre-Release docker images",
+  "name": "Build and Push unstable version",
   "description": "Part of Docker images CI process. This workflow starts Actions to build and release new 'unstable' chart version",
   "iconName": "docker-icon-color",
   "categories": [
