@@ -1,5 +1,5 @@
 {
-  "name": "Merge stable and release (part of Charts CI process)",
+  "name": "Merge stable and release",
   "description": "Part of Charts CI process. On merge to the main, stable chart version will be released",
   "iconName": "helm-icon-color",
   "categories": [

@@ -1,6 +1,6 @@
 {
-  "name": "Lint, PR, Release unstable (part of Charts CI process)",
-  "description": "This workflow starts Actions to build and release new 'unstable' chart version",
+  "name": "Lint, PR, Release unstable",
+  "description": "Part of Charts CI process. This workflow starts Actions to build and release new 'unstable' chart version",
   "iconName": "helm-icon-color",
   "categories": [
     "YAML"
