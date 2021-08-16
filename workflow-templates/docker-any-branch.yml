@@ -1,0 +1,56 @@
+name: Lint, PR, pre-Release
+# Don't forget to add secrets:
+# AZURE_CREDENTIALS
+# AZURE_DOCKER_USERNAME
+# AZURE_DOCKER_PASSWORD
+# And tag your commit with app version (semver)
+
+on:
+  push:
+    paths-ignore:
+      - ".github/**"
+      - "*.md"
+      - "LICENSE"
+    branches-ignore:
+      - main
+
+jobs:
+  faas-cli-up:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 'Checkout GitHub Action'
+        uses: actions/checkout@main
+
+      - name: Get Previous tag
+        id: previoustag
+        uses: "WyriHaximus/github-action-get-previous-tag@v1"
+        with:
+          fallback: 1.0.0
+
+      - name: 'Login via Azure CLI'
+        uses: azure/login@v1
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Login to Azure registry
+        if: success()
+        uses: docker/login-action@v1
+        with:
+          registry: iitsc.azurecr.io
+          username: ${{ secrets.AZURE_DOCKER_USERNAME }}
+          password: ${{ secrets.AZURE_DOCKER_PASSWORD }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v1
+
+      - name: Define ENV VARS
+        id: define_env
+        run: echo "::set-output name=github-sha-short::$(echo $GITHUB_SHA | cut -c 1-7)"
+
+      - name: Build and Push the OpenFaaS function
+        uses: docker/build-push-action@v2
+        with:
+          context: ./build/bob-fn/
+          file: ./build/bob-fn/Dockerfile
+          push: true
+          tags: iitsc.azurecr.io/images/${{ github.event.repository.name }}:${{ steps.previoustag.outputs.tag }}-${{ steps.define_env.outputs.github-sha-short }}
