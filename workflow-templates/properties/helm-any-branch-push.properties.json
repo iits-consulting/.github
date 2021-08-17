@@ -1,6 +1,6 @@
 {
-  "name": "Lint and Release unstable version",
-  "description": "Part of Helm charts CI process. This workflow starts Actions to build and release new 'unstable' chart version",
+  "name": "Build and Push unstable chart version",
+  "description": "Part of Helm charts CI process. On any changes in non-master branches, unstable chart version will be released",
   "iconName": "helm-icon-color",
   "categories": [
     "YAML"
