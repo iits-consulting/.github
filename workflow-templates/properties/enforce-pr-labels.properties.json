@@ -3,5 +3,9 @@
   "description": "Part of Helm charts CI process. Check on PR changes that it have one of the proper label (major, minor or patch)",
   "categories": [
     "YAML"
+  ],
+  "filePatterns": [
+    "Chart.yml",
+    "Dockerfile"
   ]
 }
