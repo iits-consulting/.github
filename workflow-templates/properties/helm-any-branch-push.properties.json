@@ -6,8 +6,6 @@
     "YAML"
   ],
   "filePatterns": [
-    "Chart.yml",
-    "values.yaml",
-    "templates"
+    "Chart.y**l"
   ]
 }
