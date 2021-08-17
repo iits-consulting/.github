@@ -1,6 +1,6 @@
 {
-  "name": "Build and Push unstable version",
-  "description": "Part of Docker images CI process. This workflow starts Actions to build and release new 'unstable' chart version",
+  "name": "Build and Push unstable app version",
+  "description": "Part of Docker images CI process. On any changes in non-master branches, unstable image version will be released",
   "iconName": "docker-icon-color",
   "categories": [
     "Dockerfile"
