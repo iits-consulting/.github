@@ -1,6 +1,6 @@
 {
   "name": "Enforce Pull-Request labels",
-  "description": "Check on Pull-Request changes that it have one of the proper label (major, minor or patch)",
+  "description": "Check on Pull-Request changes that it have one of the proper label (major, minor or patch). Need to be used as part of 'Build and Push (stable|unstable) (app|chart) version' workflows.",
   "categories": [
     "YAML"
   ],
