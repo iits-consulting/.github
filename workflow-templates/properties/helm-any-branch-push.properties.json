@@ -6,6 +6,6 @@
     "YAML"
   ],
   "filePatterns": [
-    "Chart.y**l"
+    "Chart.yml"
   ]
 }
