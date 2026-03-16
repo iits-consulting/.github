@@ -1,0 +1,83 @@
+name: Enforce Branch Protection
+
+on:
+  schedule:
+    - cron: '17 * * * *' # Every hour at :17
+  workflow_dispatch:
+    inputs:
+      cutoff_date:
+        description: 'Only process repos created after this date (YYYY-MM-DD)'
+        required: false
+        default: '2026-03-16'
+
+env:
+  CUTOFF_DATE: ${{ inputs.cutoff_date || '2026-03-16' }}
+
+jobs:
+  enforce:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Enforce branch protection on new repos
+        env:
+          GH_TOKEN: ${{ secrets.ORG_ADMIN_TOKEN }}
+        run: |
+          set -euo pipefail
+          ORG="iits-consulting"
+
+          echo "Processing repos created after $CUTOFF_DATE"
+
+          # List non-archived repos created after cutoff date
+          gh repo list "$ORG" --no-archived --json name,defaultBranchRef,createdAt --limit 500 \
+            -q --arg cutoff "$CUTOFF_DATE" \
+            '.[] | select(.defaultBranchRef != null and .createdAt >= $cutoff) | [.name, .defaultBranchRef.name] | @tsv' |
+          while IFS=$'\t' read -r repo branch; do
+            [ -z "$repo" ] && continue
+
+            # Fetch current protection (or "none" if not set)
+            protection=$(gh api "repos/$ORG/$repo/branches/$branch/protection" 2>/dev/null) || protection="none"
+
+            if [ "$protection" = "none" ]; then
+              # No protection — create from scratch
+              echo "::notice::Creating branch protection for $repo/$branch"
+              gh api --method PUT "repos/$ORG/$repo/branches/$branch/protection" \
+                --input - <<'EOF'
+          {
+            "required_pull_request_reviews": {
+              "required_approving_review_count": 1,
+              "dismiss_stale_reviews": true
+            },
+            "enforce_admins": true,
+            "required_status_checks": null,
+            "restrictions": null
+          }
+          EOF
+            else
+              # Protection exists — fix only what's missing
+              reviews=$(echo "$protection" | jq '.required_pull_request_reviews.required_approving_review_count // 0')
+              enforce=$(echo "$protection" | jq '.enforce_admins.enabled // false')
+
+              if [ "$reviews" = "0" ] || [ "$reviews" = "null" ]; then
+                echo "::notice::Enabling required reviews for $repo/$branch"
+                gh api --method PATCH \
+                  "repos/$ORG/$repo/branches/$branch/protection/required_pull_request_reviews" \
+                  --input - <<'EOF'
+          {
+            "required_approving_review_count": 1,
+            "dismiss_stale_reviews": true
+          }
+          EOF
+              fi
+
+              if [ "$enforce" = "false" ]; then
+                echo "::notice::Enabling admin enforcement for $repo/$branch"
+                gh api --method POST \
+                  "repos/$ORG/$repo/branches/$branch/protection/enforce_admins"
+              fi
+
+              if [ "$reviews" != "0" ] && [ "$reviews" != "null" ] && [ "$enforce" != "false" ]; then
+                echo "OK: $repo/$branch"
+              fi
+            fi
+          done
+
+          echo "Done."
