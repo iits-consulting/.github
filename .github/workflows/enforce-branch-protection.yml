@@ -38,8 +38,8 @@ jobs:
             if [ "$protection" = "none" ]; then
               # No protection — create from scratch
               echo "::notice::Creating branch protection for $repo/$branch"
-              gh api --method PUT "repos/$ORG/$repo/branches/$branch/protection" \
-                --input - <<'EOF'
+              if ! gh api --method PUT "repos/$ORG/$repo/branches/$branch/protection" \
+                --input - <<'EOF' 2>&1; then
           {
             "required_pull_request_reviews": {
               "required_approving_review_count": 1,
@@ -50,6 +50,9 @@ jobs:
             "restrictions": null
           }
           EOF
+                echo "::warning::Failed to set branch protection for $repo/$branch (may require a paid plan for private repos)"
+                continue
+              fi
             else
               # Protection exists — fix only what's missing
               reviews=$(echo "$protection" | jq '.required_pull_request_reviews.required_approving_review_count // 0')
@@ -57,20 +60,26 @@ jobs:
 
               if [ "$reviews" = "0" ] || [ "$reviews" = "null" ]; then
                 echo "::notice::Enabling required reviews for $repo/$branch"
-                gh api --method PATCH \
+                if ! gh api --method PATCH \
                   "repos/$ORG/$repo/branches/$branch/protection/required_pull_request_reviews" \
-                  --input - <<'EOF'
+                  --input - <<'EOF' 2>&1; then
           {
             "required_approving_review_count": 1,
             "dismiss_stale_reviews": true
           }
           EOF
+                  echo "::warning::Failed to enable required reviews for $repo/$branch (may require a paid plan for private repos)"
+                  continue
+                fi
               fi
 
               if [ "$enforce" = "false" ]; then
                 echo "::notice::Enabling admin enforcement for $repo/$branch"
-                gh api --method POST \
-                  "repos/$ORG/$repo/branches/$branch/protection/enforce_admins"
+                if ! gh api --method POST \
+                  "repos/$ORG/$repo/branches/$branch/protection/enforce_admins" 2>&1; then
+                  echo "::warning::Failed to enable admin enforcement for $repo/$branch (may require a paid plan for private repos)"
+                  continue
+                fi
               fi
 
               if [ "$reviews" != "0" ] && [ "$reviews" != "null" ] && [ "$enforce" != "false" ]; then
