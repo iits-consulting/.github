@@ -1,6 +1,5 @@
 # Don't forget to add secrets:
 # ACR_RELEASER_TOKEN
-# SLACK_BOT_TOKEN
 
 name: Lint, PR, pre-Release
 on:
@@ -10,14 +9,14 @@ on:
       - "*.md"
       - "LICENSE"
     branches-ignore:
-      - main
-      - master
+      - $default-branch
+
+permissions:
+  contents: write
 
 env:
-  HELM_EXPERIMENTAL_OCI: 1
   ACR_NAME: iitsc
   ACR_USER_NAME: iits-releaser
-  SLACK_CHANNEL_ID: "C02AJKXC8UT"
 
 jobs:
   lint:
@@ -25,20 +24,25 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v2
-        with:
-          fetch-depth: 0
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
 
       - name: Install helm
-        uses: Azure/setup-helm@v1.1
+        uses: Azure/setup-helm@bf6a7d304bc2fdb57e0331155b7ebf2c504acf0a # v4
 
       - name: Lint chart
         run: helm lint --strict
 
-      - name: Validate Kubernetes YAML files with Kubeval
+      - name: Install kubeconform
         run: |
-          helm plugin install https://github.com/instrumenta/helm-kubeval
-          helm kubeval .
+          KUBECONFORM_VERSION="v0.7.0"
+          curl -sSL -o kubeconform.tar.gz "https://github.com/yannh/kubeconform/releases/download/${KUBECONFORM_VERSION}/kubeconform-linux-amd64.tar.gz"
+          echo "c31518ddd122663b3f3aa874cfe8178cb0988de944f29c74a0b9260920d115d3  kubeconform.tar.gz" | sha256sum -c -
+          tar xzf kubeconform.tar.gz
+          sudo mv kubeconform /usr/local/bin/
+
+      - name: Validate Kubernetes manifests with kubeconform
+        run: |
+          helm template . | kubeconform -strict -summary
 
   release:
     needs: [lint]
@@ -46,18 +50,16 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v2
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
           fetch-depth: 0
 
-      - name: Set variables and outputs
-        id: define_envz
+      - name: Set variables
         run: |
           echo "GIT_SHA_SHORT=$(echo $GITHUB_SHA | cut -c 1-7)" >> $GITHUB_ENV
           echo "BRANCH_NAME=$(echo "${GITHUB_REF##*/}")" >> $GITHUB_ENV
 
       - name: Get new tag
-        id: newtag
         run: |
           ct=$(cat Chart.yaml | tr -d " " | grep -oP '(?<=version:)\d+\.\d+\.\d+')
           echo $ct
@@ -67,10 +69,10 @@ jobs:
             echo "It should have SemVer numbers and be processed by '(?<=version:)\d+\.\d+\.\d+' regexp"
             exit 1
           fi
-          echo "NEW_VERSION=$(echo ${ct}-${{ env.GIT_SHA_SHORT }})" >> $GITHUB_ENV
+          echo "NEW_VERSION=${ct}-${{ env.GIT_SHA_SHORT }}" >> $GITHUB_ENV
 
       - name: Bump version and push tag
-        uses: anothrNick/github-tag-action@1.26.0
+        uses: anothrNick/github-tag-action@4ed44965e0db8dab2b466a16da04aec3cc312fd8 # v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           DEFAULT_BUMP: none
@@ -78,62 +80,18 @@ jobs:
           CUSTOM_TAG: ${{ env.NEW_VERSION }}
 
       - name: Install helm
-        uses: Azure/setup-helm@v1.1
+        uses: Azure/setup-helm@bf6a7d304bc2fdb57e0331155b7ebf2c504acf0a # v4
 
       - name: Login to ACR using helm
+        env:
+          HELM_REGISTRY_PASSWORD: ${{ secrets.ACR_RELEASER_TOKEN }}
         run: |
-          echo ${{ secrets.ACR_RELEASER_TOKEN }} | helm registry login ${{ env.ACR_NAME }}.azurecr.io --username ${{ env.ACR_USER_NAME }} --password-stdin
+          echo "$HELM_REGISTRY_PASSWORD" | helm registry login ${{ env.ACR_NAME }}.azurecr.io --username ${{ env.ACR_USER_NAME }} --password-stdin
 
-      - name: Save helm chart to locally
+      - name: Package helm chart
         run: |
-          helm chart save . ${{ env.ACR_NAME }}.azurecr.io/charts/${{ github.event.repository.name }}:${{ env.NEW_VERSION }}
+          helm package . --version ${{ env.NEW_VERSION }}
 
-      - name: Publish chart to the ACR
+      - name: Push chart to ACR
         run: |
-          helm chart push ${{ env.ACR_NAME }}.azurecr.io/charts/${{ github.event.repository.name }}:${{ env.NEW_VERSION }}
-
-###############################################################
-######## To use Slack app notifications, create json  #########
-####### payload file before and uncomment steps below #########
-###############################################################
-#      - name: Notify slack success
-#        if: ${{ success() }}
-#        env:
-#          SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
-#        uses: iits-consulting/slack-action@master
-#        with:
-#          channel_id: ${{ env.SLACK_CHANNEL_ID }}
-#          payload_file: ".github/success_slack_message.json"
-#          replaceme_1: ${{ github.event.repository.name }}
-#          replaceme_2: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}
-#          replaceme_3: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}
-#          replaceme_4: ${{ env.NEW_VERSION }}
-#
-#      - name: Notify slack failed
-#        if: ${{ failure() }}
-#        env:
-#          SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
-#        uses: iits-consulting/slack-action@master
-#        with:
-#          channel_id: ${{ env.SLACK_CHANNEL_ID }}
-#          payload_file: ".github/failed_slack_message.json"
-#          replaceme_1: ${{ github.event.repository.name }}
-#          replaceme_2: "${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}"
-#          replaceme_3: "${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
-#          replaceme_4: ${{ env.NEW_VERSION }}
-#      - name: Notify slack aborted
-#        if: ${{ cancelled() }}
-#        env:
-#          SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
-#        uses: iits-consulting/slack-action@master
-#        with:
-#          channel_id: ${{ env.SLACK_CHANNEL_ID }}
-#          payload_file: ".github/aborted_slack_message.json"
-#          replaceme_1: ${{ github.event.repository.name }}
-#          replaceme_2: "${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}"
-#          replaceme_3: "${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
-#          replaceme_4: ${{ env.NEW_VERSION }}
-
-
-
-
+          helm push ${{ github.event.repository.name }}-${{ env.NEW_VERSION }}.tgz oci://${{ env.ACR_NAME }}.azurecr.io/charts

@@ -1,19 +1,19 @@
 # Don't forget to add secrets:
 # ACR_RELEASER_TOKEN
-# SLACK_BOT_TOKEN
 
 name: Merge stable and release
 on:
   push:
     branches:
-      - main
-      - master
+      - $default-branch
+
+permissions:
+  contents: write
+  pull-requests: read
 
 env:
-  HELM_EXPERIMENTAL_OCI: 1
   ACR_NAME: iitsc
   ACR_USER_NAME: iits-releaser
-  SLACK_CHANNEL_ID: "C02AJKXC8UT"
 
 jobs:
   lint-and-release-stable:
@@ -21,129 +21,95 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v2
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
           fetch-depth: 0
 
       - name: Install helm
-        uses: Azure/setup-helm@v1.1
+        uses: Azure/setup-helm@bf6a7d304bc2fdb57e0331155b7ebf2c504acf0a # v4
 
       - name: Lint chart
         run: helm lint
 
       - name: Check PR labels action step
         id: check_pr_labels_major
-        uses: shioyang/check-pr-labels-on-push-action@v1.0.3
+        uses: shioyang/check-pr-labels-on-push-action@6902edf856909c50ff1d69b2cd7dc0d82f1061b6 # v1.0.3
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           labels: '["major"]'
 
       - name: Check PR labels action step
         id: check_pr_labels_minor
-        uses: shioyang/check-pr-labels-on-push-action@v1.0.3
+        uses: shioyang/check-pr-labels-on-push-action@6902edf856909c50ff1d69b2cd7dc0d82f1061b6 # v1.0.3
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           labels: '["minor"]'
 
       - name: Check PR labels action step
         id: check_pr_labels_patch
-        uses: shioyang/check-pr-labels-on-push-action@v1.0.3
+        uses: shioyang/check-pr-labels-on-push-action@6902edf856909c50ff1d69b2cd7dc0d82f1061b6 # v1.0.3
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           labels: '["patch"]'
 
       - name: Select proper label
+        env:
+          LABEL_MAJOR: ${{ steps.check_pr_labels_major.outputs.result }}
+          LABEL_MINOR: ${{ steps.check_pr_labels_minor.outputs.result }}
+          LABEL_PATCH: ${{ steps.check_pr_labels_patch.outputs.result }}
         run: |
-          if [[ "${{ steps.check_pr_labels_major.outputs.result }}" = true ]]; then
-            echo "CORRECT_LABEL=$(echo "major")" >> $GITHUB_ENV
-          elif [[ "${{ steps.check_pr_labels_minor.outputs.result }}" = true ]]; then
-            echo "CORRECT_LABEL=$(echo "minor")" >> $GITHUB_ENV
-          elif [[ "${{ steps.check_pr_labels_patch.outputs.result }}" = true ]]; then
-            echo "CORRECT_LABEL=$(echo "patch")" >> $GITHUB_ENV
+          if [[ "$LABEL_MAJOR" = true ]]; then
+            echo "CORRECT_LABEL=major" >> $GITHUB_ENV
+          elif [[ "$LABEL_MINOR" = true ]]; then
+            echo "CORRECT_LABEL=minor" >> $GITHUB_ENV
+          elif [[ "$LABEL_PATCH" = true ]]; then
+            echo "CORRECT_LABEL=patch" >> $GITHUB_ENV
           else
-            echo "CORRECT_LABEL=$(echo "patch")" >> $GITHUB_ENV
+            echo "CORRECT_LABEL=patch" >> $GITHUB_ENV
           fi
 
       - name: Get Previous tag
         id: previoustag
-        uses: "WyriHaximus/github-action-get-previous-tag@v1"
+        uses: WyriHaximus/github-action-get-previous-tag@27c04b107bd8de27966ed909e0992078a9121de8 # v1
 
       - name: Put new version to the ENV
+        env:
+          PREVIOUS_TAG: ${{ steps.previoustag.outputs.tag }}
         run: |
-          t=$(echo "${{ steps.previoustag.outputs.tag }}" | cut -d- -f1)
-          echo "CURRENT_VERSION=`echo ${t}`" >> $GITHUB_ENV
+          t=$(echo "$PREVIOUS_TAG" | cut -d- -f1)
+          echo "CURRENT_VERSION=${t}" >> $GITHUB_ENV
 
       - name: Calculate new version
-        uses: actions-ecosystem/action-bump-semver@v1
+        uses: actions-ecosystem/action-bump-semver@4675bfabe91e6bff16f516e92fb0693e4f3acd79 # v1
         id: bump_semver
         with:
           current_version: ${{ env.CURRENT_VERSION }}
           level: ${{ env.CORRECT_LABEL }}
 
       - name: Find and replace version in Chart.yaml
-        uses: jacobtomlinson/gha-find-replace@master
+        uses: jacobtomlinson/gha-find-replace@2ff30f644d2e0078fc028beb9193f5ff0dcad39e # v3
         with:
           find: "version:.*"
           replace: "version: ${{ steps.bump_semver.outputs.new_version }}"
           include: Chart.yaml
 
       - name: Commit and push changes
-        uses: EndBug/add-and-commit@v7
+        uses: EndBug/add-and-commit@a94899bca583c204427a224a7af87c02f9b325d5 # v9
         with:
           add: Chart.yaml
           message: "[Auto-update] version updated"
           tag: ${{ steps.bump_semver.outputs.new_version }}
 
       - name: Login to ACR using helm
+        env:
+          HELM_REGISTRY_PASSWORD: ${{ secrets.ACR_RELEASER_TOKEN }}
         run: |
-          echo ${{ secrets.ACR_RELEASER_TOKEN }} | helm registry login ${{ env.ACR_NAME }}.azurecr.io --username ${{ env.ACR_USER_NAME }} --password-stdin
+          echo "$HELM_REGISTRY_PASSWORD" | helm registry login ${{ env.ACR_NAME }}.azurecr.io --username ${{ env.ACR_USER_NAME }} --password-stdin
 
-      - name: Save helm chart to locally
+      - name: Package helm chart
         run: |
-          helm chart save . ${{ env.ACR_NAME }}.azurecr.io/charts/${{ github.event.repository.name }}:${{ steps.bump_semver.outputs.new_version }}
+          helm package . --version ${{ steps.bump_semver.outputs.new_version }}
 
-      - name: Publish chart to the ACR
+      - name: Push chart to ACR
         run: |
-          helm chart push ${{ env.ACR_NAME }}.azurecr.io/charts/${{ github.event.repository.name }}:${{ steps.bump_semver.outputs.new_version }}
-
-###############################################################
-######## To use Slack app notifications, create json  #########
-####### payload file before and uncomment steps below #########
-###############################################################
-#      - name: Notify slack success
-#        if: ${{ success() }}
-#        env:
-#          SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
-#        uses: iits-consulting/slack-action@master
-#        with:
-#          channel_id: ${{ env.SLACK_CHANNEL_ID }}
-#          payload_file: ".github/success_slack_message.json"
-#          replaceme_1: ${{ github.event.repository.name }}
-#          replaceme_2: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}
-#          replaceme_3: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}
-#          replaceme_4: ${{ env.NEW_VERSION }}
-#
-#      - name: Notify slack failed
-#        if: ${{ failure() }}
-#        env:
-#          SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
-#        uses: iits-consulting/slack-action@master
-#        with:
-#          channel_id: ${{ env.SLACK_CHANNEL_ID }}
-#          payload_file: ".github/failed_slack_message.json"
-#          replaceme_1: ${{ github.event.repository.name }}
-#          replaceme_2: "${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}"
-#          replaceme_3: "${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
-#          replaceme_4: ${{ env.NEW_VERSION }}
-#      - name: Notify slack aborted
-#        if: ${{ cancelled() }}
-#        env:
-#          SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
-#        uses: iits-consulting/slack-action@master
-#        with:
-#          channel_id: ${{ env.SLACK_CHANNEL_ID }}
-#          payload_file: ".github/aborted_slack_message.json"
-#          replaceme_1: ${{ github.event.repository.name }}
-#          replaceme_2: "${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}"
-#          replaceme_3: "${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
-#          replaceme_4: ${{ env.NEW_VERSION }}
+          helm push ${{ github.event.repository.name }}-${{ steps.bump_semver.outputs.new_version }}.tgz oci://${{ env.ACR_NAME }}.azurecr.io/charts

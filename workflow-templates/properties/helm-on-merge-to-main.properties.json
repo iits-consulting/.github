@@ -1,6 +1,6 @@
 {
   "name": "Build and Push stable chart version",
-  "description": "Part of Helm charts CI process. On merge Pull-Request to the master branch, stable chart version will be released",
+  "description": "Part of Helm charts CI process. On merge Pull-Request to the default branch, stable chart version will be released",
   "iconName": "helm-icon-color",
   "categories": [
     "YAML"

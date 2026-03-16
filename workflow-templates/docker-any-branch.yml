@@ -12,91 +12,52 @@ on:
       - "*.md"
       - "LICENSE"
     branches-ignore:
-      - master
-env:
-  SLACK_CHANNEL_ID: "C02AJKXC8UT"
+      - $default-branch
+
+permissions:
+  contents: write
+
 jobs:
   lint-and-release:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v2
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
           fetch-depth: 0
 
       - name: Get Previous tag
         id: previoustag
-        uses: "WyriHaximus/github-action-get-previous-tag@v1"
+        uses: WyriHaximus/github-action-get-previous-tag@27c04b107bd8de27966ed909e0992078a9121de8 # v1
 
-      - name: 'Login via Azure CLI'
-        uses: azure/login@v1
+      - name: Login via Azure CLI
+        uses: azure/login@1384c340ab2dda50fed2bee3041d1d87018aa5e8 # v2
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
 
       - name: Login to Azure registry
         if: success()
-        uses: docker/login-action@v1
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
         with:
           registry: iitsc.azurecr.io
           username: ${{ secrets.AZURE_DOCKER_USERNAME }}
           password: ${{ secrets.AZURE_DOCKER_PASSWORD }}
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v1
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
 
       - name: Define ENV VARS
         id: define_env
-        run: echo "::set-output name=github-sha-short::$(echo $GITHUB_SHA | cut -c 1-7)"
+        run: echo "github-sha-short=$(echo $GITHUB_SHA | cut -c 1-7)" >> $GITHUB_OUTPUT
 
       - name: Build and Push Docker image
-        uses: docker/build-push-action@v2
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
         with:
           push: true
           tags: iitsc.azurecr.io/images/${{ github.event.repository.name }}:${{ steps.previoustag.outputs.tag }}-${{ steps.define_env.outputs.github-sha-short }}
 
       - name: Bump version and push tag
-        uses: ChloePlanet/github-tag-action@master
+        uses: ChloePlanet/github-tag-action@2df1aa77eeff877c3df7b83ec9e93d9376427faa # 2.0.3
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           CUSTOM_TAG: ${{ steps.previoustag.outputs.tag }}-${{ steps.define_env.outputs.github-sha-short }}
-
-###############################################################
-######## To use Slack app notifications, create json  #########
-####### payload file before and uncomment steps below #########
-###############################################################
-#      - name: Notify slack success
-#        if: ${{ success() }}
-#        env:
-#          SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
-#        uses: iits-consulting/slack-action@master
-#        with:
-#          channel_id: ${{ env.SLACK_CHANNEL_ID }}
-#          payload_file: ".github/success_slack_message.json"
-#          replaceme_1: ${{ github.event.repository.name }}
-#          replaceme_2: "${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}"
-#          replaceme_3: "${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
-#          replaceme_4: ${{ needs.prepare-stable.outputs.new_tag }}
-#      - name: Notify slack failed
-#        if: ${{ failure() }}
-#        env:
-#          SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
-#        uses: iits-consulting/slack-action@master
-#        with:
-#          channel_id: ${{ env.SLACK_CHANNEL_ID }}
-#          payload_file: ".github/failed_slack_message.json"
-#          replaceme_1: ${{ github.event.repository.name }}
-#          replaceme_2: "${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}"
-#          replaceme_3: "${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
-#          replaceme_4: ${{ needs.prepare-stable.outputs.new_tag }}
-#      - name: Notify slack aborted
-#        if: ${{ cancelled() }}
-#        env:
-#          SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
-#        uses: iits-consulting/slack-action@master
-#        with:
-#          channel_id: ${{ env.SLACK_CHANNEL_ID }}
-#          payload_file: ".github/aborted_slack_message.json"
-#          replaceme_1: ${{ github.event.repository.name }}
-#          replaceme_2: "${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}"
-#          replaceme_3: "${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
-#          replaceme_4: ${{ needs.prepare-stable.outputs.new_tag }}

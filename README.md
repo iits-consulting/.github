@@ -1,36 +1,58 @@
-<p align="center">
-  <img src="https://avatars0.githubusercontent.com/u/44036562?s=100&v=4"/> 
-</p>
+# iits-consulting GitHub Workflow Templates
 
-## IITS Workflows collection
+Organization-wide [reusable workflow templates](https://docs.github.com/en/actions/using-workflows/creating-starter-workflows) for the `iits-consulting` GitHub organization.
 
-These are the workflow files for helping people get started with GitHub Actions.  They're presented whenever you start to create a new GitHub Actions workflow.
+These templates appear in the **Actions** tab when creating a new workflow in any repository within the organization.
 
-**If you want to get started with GitHub Actions, you can use these starter workflows by clicking the "Actions" tab in the repository where you want to create a workflow.**
+## Workflow Templates
 
-<img src="https://d3vv6lp55qjaqc.cloudfront.net/items/353A3p3Y2x3c2t2N0c01/Image%202019-08-27%20at%203.25.07%20PM.png" max-width="75%"/>
+| Template | Description |
+|----------|-------------|
+| **docker-on-merge-to-main** | Build and push a stable Docker image on merge to the default branch, with semver tagging based on PR labels |
+| **docker-any-branch** | Build and push a pre-release Docker image on feature branch pushes |
+| **helm-on-merge-to-main** | Lint, version-bump, and push a stable Helm chart to ACR on merge to the default branch |
+| **helm-any-branch-push** | Lint, validate, and push a pre-release Helm chart to ACR on feature branch pushes |
+| **enforce-pr-labels** | Require `major`, `minor`, or `patch` labels on pull requests |
 
-### Directory structure
+## Organization Workflows
 
-* [ci](ci): solutions for Continuous Integration
-* [automation](automation): solutions for automating workflows.
-* [code-scanning](code-scanning): starter workflows for [Code Scanning](https://github.com/features/security)
-* [icons](icons): svg icons for the relevant template
+| Workflow | Description |
+|----------|-------------|
+| **enforce-branch-protection** | Automatically enforce branch protection rules on newly created repositories (runs hourly) |
 
-Each workflow must be written in YAML and have a `.yml` extension. They also need a corresponding `.properties.json` file that contains extra metadata about the workflow (this is displayed in the GitHub.com UI).
+## Directory Structure
 
-For example: `ci/django.yml` and `ci/properties/django.properties.json`.
+```
+workflow-templates/           # Starter workflow YAML files
+  properties/                 # Metadata JSON for each template (shown in GitHub UI)
+  docker-icon-color.svg       # Icon for Docker templates
+  helm-icon-color.svg         # Icon for Helm templates
+.github/workflows/            # Org-level automation workflows
+```
 
-### Valid properties
+## Security Practices
 
-* `name`: the name shown in onboarding
-* `description`: the description shown in onboarding
-* `iconName`: the icon name in the relevant folder, for example `django` should have an icon `icons/django.svg`. Only SVG is supported at this time
-* `categories`: the categories that it will be shown under
+All workflow templates follow [GitHub's security hardening guidelines](https://docs.github.com/en/actions/security-for-github-actions/security-guides/security-hardening-for-github-actions):
 
-### Variables
-These variables can be placed in the starter workflow and will be substituted as detailed below:
+- **SHA-pinned actions** — Every third-party action is pinned to a full commit SHA to prevent supply chain attacks
+- **Least-privilege permissions** — Explicit `permissions:` blocks grant only the minimum `GITHUB_TOKEN` scopes needed
+- **No script injection** — Step outputs are passed via `env:` mappings, never interpolated directly in `run:` blocks
+- **Verified tool installs** — Binary downloads (e.g., kubeconform) are version-pinned with SHA-256 checksum verification
+- **Secret hygiene** — Secrets are passed through environment variables, never expanded inline in shell commands
 
-* `$default-branch`: will substitute the branch from the repository, for example `main` and `master`
-* `$protected-branches`: will substitue any protected branches from the repository.
-* `$cron-daily`: will substitute a valid but random time within the day
+## Required Secrets
+
+### Docker templates
+- `AZURE_CREDENTIALS` — Azure service principal credentials
+- `AZURE_DOCKER_USERNAME` — ACR username
+- `AZURE_DOCKER_PASSWORD` — ACR password
+
+### Helm templates
+- `ACR_RELEASER_TOKEN` — ACR token for Helm registry push
+
+### Branch protection workflow
+- `ORG_ADMIN_TOKEN` — GitHub PAT with org admin permissions
+
+## License
+
+[MIT](LICENSE)
