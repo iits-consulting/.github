@@ -28,8 +28,7 @@ jobs:
 
           # List non-archived repos created after cutoff date
           gh repo list "$ORG" --no-archived --json name,defaultBranchRef,createdAt --limit 500 \
-            -q --arg cutoff "$CUTOFF_DATE" \
-            '.[] | select(.defaultBranchRef != null and .createdAt >= $cutoff) | [.name, .defaultBranchRef.name] | @tsv' |
+            -q ".[] | select(.defaultBranchRef != null and .createdAt >= \"$CUTOFF_DATE\") | [.name, .defaultBranchRef.name] | @tsv" |
           while IFS=$'\t' read -r repo branch; do
             [ -z "$repo" ] && continue
 
