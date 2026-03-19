@@ -30,6 +30,42 @@ workflow-templates/           # Starter workflow YAML files
 .github/workflows/            # Org-level automation workflows
 ```
 
+## Compliance: Code Change Review Enforcement
+
+This repository serves as the **central enforcement mechanism** for code change reviews across the `iits-consulting` GitHub organization, satisfying the following ISO 27001:2017 controls:
+
+| Control | Name | How It Is Satisfied |
+|---------|------|---------------------|
+| **A.14.2.2** | System change control procedures | Branch protection requires PR approval before merge; the `enforce-branch-protection` workflow ensures this is applied org-wide |
+| **A.12.1.2** | Change management | All code changes must pass through a pull request with at least one independent reviewer |
+
+### How It Works
+
+The [`enforce-branch-protection`](.github/workflows/enforce-branch-protection.yml) workflow runs **every hour** and automatically applies the following rules to the default branch of every repository in the organization:
+
+1. **Required pull request reviews** — At least **1 approving review** is required before merging
+2. **Dismiss stale reviews** — If new commits are pushed after approval, the approval is invalidated and a new review is required
+3. **Admin enforcement** — Administrators cannot bypass branch protection rules, ensuring no exceptions
+4. **Automatic remediation** — Newly created repositories are detected and configured automatically, eliminating manual setup errors
+
+### Evidence for Auditors
+
+| Evidence Type | Location |
+|---------------|----------|
+| Automated enforcement workflow | [`.github/workflows/enforce-branch-protection.yml`](.github/workflows/enforce-branch-protection.yml) |
+| Workflow run history (hourly) | [Actions tab — Enforce Branch Protection](../../actions/workflows/enforce-branch-protection.yml) |
+| Branch protection API state per repo | `gh api repos/iits-consulting/{repo}/branches/main/protection` |
+| PR review history per repo | Visible in each repository's pull request history |
+| Vanta automated test | `code-review-application-config` — "Application changes reviewed" |
+
+### Workflow Templates as Additional Controls
+
+The workflow templates in this repository provide further change management controls:
+
+- **enforce-pr-labels** — Requires semantic version labels (`major`, `minor`, `patch`) on every PR, enforcing conscious classification of change impact
+- **docker/helm-on-merge-to-main** — Stable releases are only built from the default branch (i.e., after PR approval and merge), preventing unapproved code from being deployed
+- **docker/helm-any-branch** — Feature branch builds produce pre-release artifacts only, clearly separated from production versions
+
 ## Security Practices
 
 All workflow templates follow [GitHub's security hardening guidelines](https://docs.github.com/en/actions/security-for-github-actions/security-guides/security-hardening-for-github-actions):
